@@ -26,10 +26,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/eds-qa-helper"
+    "url": "https://github.com/gabrielbagon/eds-qa-helper"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/eds-qa-helper#readme",
+  "homepage": "https://github.com/gabrielbagon/eds-qa-helper#readme",
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/eds-qa-helper/issues"
+    "url": "https://github.com/gabrielbagon/eds-qa-helper/issues"
   }
 }

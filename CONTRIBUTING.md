@@ -6,13 +6,13 @@ Thanks for your interest in contributing! This tool is built by AEM EDS develope
 
 ### Reporting Bugs
 
-1. Open [an issue](https://github.com/YOUR_USERNAME/eds-qa-helper/issues/new?template=bug_report.md)
+1. Open [an issue](https://github.com/gabrielbagon/eds-qa-helper/issues/new?template=bug_report.md)
 2. Include: browser, environment (preview/localhost/live), steps to reproduce
 3. If possible, paste the console output
 
 ### Suggesting Features
 
-1. Open [a feature request](https://github.com/YOUR_USERNAME/eds-qa-helper/issues/new?template=feature_request.md)
+1. Open [a feature request](https://github.com/gabrielbagon/eds-qa-helper/issues/new?template=feature_request.md)
 2. Describe the problem you're trying to solve
 3. If you have an idea for the solution, share it
 
