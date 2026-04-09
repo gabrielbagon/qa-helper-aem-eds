@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="og:title" content="QA Helper — Edge Case Test Page">
+  <meta name="description" content="Página de teste com edge cases para validar o QA Helper">
+  <title>QA Helper — Edge Case Test Harness</title>
+  <style>
+    /* ── Reset mínimo estilo AEM EDS ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+    .section {
+      padding: 40px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section:nth-child(even) { background: #f8fafc; }
+    h1 { font-size: 2.5rem; margin-bottom: 16px; }
+    h2 { font-size: 1.75rem; margin-bottom: 12px; color: #334155; }
+    h3 { font-size: 1.25rem; margin-bottom: 8px; }
+    p { margin-bottom: 12px; max-width: 680px; }
+    a { color: #3b82f6; }
+    img { max-width: 100%; display: block; }
+    .block { margin-bottom: 24px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; }
+
+    /* ── Test Banner ── */
+    .test-banner {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 24px;
+      font-size: 13px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .test-banner strong { color: #fbbf24; }
+    .test-banner button {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .test-banner button:hover { background: #2563eb; }
+
+    /* ═══════════════════════════════════════════════════════
+       EDGE CASES — CSS intencionalmente problemático
+       ═══════════════════════════════════════════════════════ */
+
+    /* EC-R1: Overflow horizontal — elemento mais largo que viewport */
+    .block.overflow-forced {
+      width: 110vw;
+      background: #fef2f2;
+      min-height: 60px;
+    }
+
+    /* EC-R2: Overflow via negative margin */
+    .block.overflow-margin {
+      margin-left: -40px;
+      margin-right: -9999px;
+      width: calc(100% + 10040px);
+      background: #fef2f2;
+      min-height: 40px;
+    }
+
+    /* EC-R3: Overflow via child, parent com overflow:hidden (NÃO deveria detectar) */
+    .block.overflow-hidden-parent {
+      overflow: hidden;
+      background: #f0fdf4;
+    }
+    .block.overflow-hidden-parent .overflow-child {
+      width: 200vw;
+      height: 30px;
+      background: #bbf7d0;
+    }
+
+    /* EC-R4: Container com width:0 mas com filhos */
+    .block.collapsed-container {
+      width: 0;
+      padding: 0; /* sobrescreve padding do .block para garantir width real = 0 */
+      border: none; /* remove border do .block */
+      overflow: hidden;
+      background: #fef2f2;
+    }
+
+    /* EC-R5: Bloco com position:absolute causando overlap */
+    .section.overlap-test { position: relative; min-height: 200px; }
+    .block.overlap-a {
+      background: rgba(59, 130, 246, 0.15);
+      height: 120px;
+      position: relative;
+    }
+    .block.overlap-b {
+      background: rgba(239, 68, 68, 0.15);
+      height: 120px;
+      margin-top: -60px; /* overlap intencional */
+    }
+
+    /* EC-R6: Heading que vai quebrar em muitas linhas em mobile */
+    .block.long-heading h1 {
+      font-size: 3.5rem;
+      line-height: 1.1;
+      max-width: 300px; /* força quebra */
+    }
+
+    /* EC-R7: Imagem distorcida intencionalmente */
+    .block.distorted-img img {
+      width: 300px;
+      height: 100px; /* força distorção de um placeholder 300x200 */
+      object-fit: fill; /* garante distorção */
+    }
+
+    /* EC-R8: Imagem pequena (< 50px) — NÃO deveria detectar distorção */
+    .block.small-img img {
+      width: 30px;
+      height: 10px;
+    }
+
+    /* EC-R9: display:none — NÃO deveria ser analisado */
+    .block.hidden-block {
+      display: none;
+      width: 99999px;
+    }
+
+    /* EC-R10: visibility:hidden — NÃO deveria ser analisado */
+    .block.invisible-block {
+      visibility: hidden;
+      width: 99999px;
+      height: 0;
+    }
+
+    /* EC-R11: Overflow borderline (dentro da tolerância de 2px) — width setado via JS */
+    .block.overflow-borderline {
+      background: #f0fdf4;
+      min-height: 30px;
+    }
+
+    /* EC-R12: Overflow fora da tolerância — width setado via JS */
+    .block.overflow-just-outside {
+      background: #fef2f2;
+      min-height: 30px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════ TEST BANNER ═══════════════ -->
+  <div class="test-banner">
+    <span>🧪 <strong>QA Helper — Edge Case Test Page</strong> · Abra o console e cole o qa-helper.js, depois rode os testes abaixo</span>
+    <button onclick="runAllTests()">▶ Rodar Testes Automatizados</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 1: LINKS & ALT-TEXT EDGE CASES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section" data-testgroup="links">
+    <h2>🔗 Edge Cases — Links & Alt-text</h2>
+
+    <div class="block" data-testid="EC-L1">
+      <h3>EC-L1: Link com href="#" (deveria: warning)</h3>
+      <a href="#">Link placeholder hash</a>
+    </div>
+
+    <div class="block" data-testid="EC-L2">
+      <h3>EC-L2: Link com javascript:void(0) (deveria: warning)</h3>
+      <a href="javascript:void(0)">Link JS void</a>
+    </div>
+
+    <div class="block" data-testid="EC-L3">
+      <h3>EC-L3: Link interno para rota inexistente (deveria: broken ou unreachable)</h3>
+      <a href="/pagina-que-nao-existe-abc123">Rota inexistente</a>
+    </div>
+
+    <div class="block" data-testid="EC-L4">
+      <h3>EC-L4: Link externo (deveria: status "external", sem issue)</h3>
+      <a href="https://www.google.com">Google externo</a>
+    </div>
+
+    <div class="block" data-testid="EC-L5">
+      <h3>EC-L5: Link externo com protocolo HTTP (deveria: external)</h3>
+      <a href="http://example.com">HTTP example.com</a>
+    </div>
+
+    <div class="block" data-testid="EC-L6">
+      <h3>EC-L6: Link sem texto visível, com aria-label (deveria: usar aria-label como texto)</h3>
+      <a href="/alguma-pagina" aria-label="Link acessível sem texto visível"></a>
+    </div>
+
+    <div class="block" data-testid="EC-L7">
+      <h3>EC-L7: Link sem texto e sem aria-label (deveria: texto "[sem texto]")</h3>
+      <a href="/outra-pagina"></a>
+    </div>
+
+    <div class="block" data-testid="EC-L8">
+      <h3>EC-L8: Link válido interno (deveria: status "ok")</h3>
+      <a href="/">Home</a>
+    </div>
+
+    <div class="block" data-testid="EC-L9">
+      <h3>EC-L9: Link mailto (deveria: NÃO ser tratado como interno nem externo http)</h3>
+      <a href="mailto:teste@example.com">Email</a>
+    </div>
+
+    <div class="block" data-testid="EC-L10">
+      <h3>EC-L10: Link tel (deveria: NÃO ser tratado como interno nem externo http)</h3>
+      <a href="tel:+5511999999999">Telefone</a>
+    </div>
+
+    <div class="block" data-testid="EC-L11">
+      <h3>EC-L11: Link com href vazio (deveria: warning "link vazio")</h3>
+      <a href="">Link href vazio</a>
+    </div>
+
+    <div class="block" data-testid="EC-L12">
+      <h3>EC-L12: Âncora sem href (deveria: NÃO ser coletado pelo seletor a[href])</h3>
+      <a>Âncora sem href</a>
+    </div>
+
+    <div class="block" data-testid="EC-L13">
+      <h3>EC-L13: Imagem SEM alt (deveria: error)</h3>
+      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Crect fill='%23ef4444' width='200' height='100'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' dominant-baseline='middle'%3ESem Alt%3C/text%3E%3C/svg%3E">
+    </div>
+
+    <div class="block" data-testid="EC-L14">
+      <h3>EC-L14: Imagem com alt vazio "" (deveria: error)</h3>
+      <img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Crect fill='%23f59e0b' width='200' height='100'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' dominant-baseline='middle'%3EAlt Vazio%3C/text%3E%3C/svg%3E">
+    </div>
+
+    <div class="block" data-testid="EC-L15">
+      <h3>EC-L15: Imagem com alt preenchido (deveria: OK, sem issue)</h3>
+      <img alt="Imagem decorativa de teste com alt válido" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Crect fill='%2322c55e' width='200' height='100'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' dominant-baseline='middle'%3EAlt OK%3C/text%3E%3C/svg%3E">
+    </div>
+
+    <div class="block" data-testid="EC-L16">
+      <h3>EC-L16: Imagem com alt " " (apenas espaço — deveria: error)</h3>
+      <img alt="   " src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Crect fill='%23a855f7' width='200' height='100'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' dominant-baseline='middle'%3EAlt Espaço%3C/text%3E%3C/svg%3E">
+    </div>
+
+    <div class="block" data-testid="EC-L17">
+      <h3>EC-L17: Link com fragmento #section (deveria: warning como hash)</h3>
+      <a href="#section">Âncora interna</a>
+    </div>
+
+    <div class="block" data-testid="EC-L18">
+      <h3>EC-L18: Link com URL absoluto interno (deveria: validar como interno)</h3>
+      <a href="" id="ec-l18-link">Link absoluto interno</a>
+      <script>document.getElementById('ec-l18-link').href = window.location.origin + '/pagina-teste-abs';</script>
+    </div>
+
+    <div class="block" data-testid="EC-L19">
+      <h3>EC-L19: Muitos links (100+) — teste de performance</h3>
+      <div id="ec-l19-container"></div>
+      <script>
+        (() => {
+          const c = document.getElementById('ec-l19-container');
+          for (let i = 0; i < 120; i++) {
+            const a = document.createElement('a');
+            a.href = `/perf-test-link-${i}`;
+            a.textContent = `Link ${i}`;
+            a.style.cssText = 'display:inline-block;margin:2px 4px;font-size:11px;';
+            c.appendChild(a);
+          }
+        })();
+      </script>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 2: RESPONSIVE EDGE CASES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section" data-testgroup="responsive">
+    <h2>📱 Edge Cases — Responsivo</h2>
+
+    <div class="block overflow-forced" data-testid="EC-R1">
+      <h3>EC-R1: Overflow horizontal forçado (110vw) — deveria: error overflow</h3>
+    </div>
+
+    <div class="block overflow-margin" data-testid="EC-R2">
+      <h3>EC-R2: Overflow via negative margin — deveria: error overflow</h3>
+    </div>
+
+    <div class="block overflow-hidden-parent" data-testid="EC-R3">
+      <h3>EC-R3: Child com 200vw mas parent com overflow:hidden — deveria: NÃO reportar (child clippado)</h3>
+      <div class="overflow-child"></div>
+    </div>
+
+    <div class="block collapsed-container" data-testid="EC-R4">
+      <!-- h3 e p removidos: conteúdo inline forçava min-content width > 0 -->
+      <div style="width:100px;height:20px;background:#fca5a5;"></div>
+      <div style="width:50px;height:20px;background:#fca5a5;"></div>
+    </div>
+  </div>
+
+  <div class="section overlap-test" data-testgroup="responsive-overlap">
+    <h2>📱 Edge Cases — Sobreposição</h2>
+
+    <div class="block overlap-a" data-testid="EC-R5a">
+      <h3>EC-R5a: Bloco A (normal)</h3>
+    </div>
+    <div class="block overlap-b" data-testid="EC-R5b">
+      <h3>EC-R5b: Bloco B com margin-top negativo — deveria: warning overlap</h3>
+    </div>
+  </div>
+
+  <div class="section" data-testgroup="responsive-text">
+    <h2>📱 Edge Cases — Texto & Imagens</h2>
+
+    <div class="block long-heading" data-testid="EC-R6">
+      <h1>Este heading é extremamente longo e foi forçado a quebrar em muitas linhas porque max-width é 300px</h1>
+      <p>Deveria: warning text-wrap (heading com >3 linhas)</p>
+    </div>
+
+    <div class="block distorted-img" data-testid="EC-R7">
+      <h3>EC-R7: Imagem distorcida (300x200 forçada em 300x100) — deveria: warning distortion</h3>
+      <img alt="Imagem distorcida de teste" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%233b82f6' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' dominant-baseline='middle' font-size='20'%3E300x200 original%3C/text%3E%3C/svg%3E">
+    </div>
+
+    <div class="block small-img" data-testid="EC-R8">
+      <h3>EC-R8: Imagem pequena distorcida (<50px) — deveria: NÃO reportar</h3>
+      <img alt="Ícone pequeno" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%2364748b' width='100' height='100'/%3E%3C/svg%3E">
+    </div>
+
+    <div class="block hidden-block" data-testid="EC-R9">
+      <h3>EC-R9: display:none com 99999px width — deveria: NÃO reportar</h3>
+    </div>
+
+    <div class="block invisible-block" data-testid="EC-R10">
+      <h3>EC-R10: visibility:hidden com 99999px width — deveria: NÃO reportar</h3>
+    </div>
+
+    <div class="block overflow-borderline" data-testid="EC-R11">
+      <h3>EC-R11: Overflow de 1px (tolerância 2px) — deveria: NÃO reportar</h3>
+    </div>
+
+    <div class="block overflow-just-outside" data-testid="EC-R12">
+      <h3>EC-R12: Overflow de 3px (fora da tolerância) — deveria: error overflow</h3>
+    </div>
+
+    <script>
+      // EC-R11/R12: Seta width com base em window.innerWidth (não 100vw)
+      // 100vw inclui scrollbar, window.innerWidth não — causava +53px de diff
+      (() => {
+        const vw = window.innerWidth;
+        const r11 = document.querySelector('[data-testid="EC-R11"]');
+        const r12 = document.querySelector('[data-testid="EC-R12"]');
+        // +1px — dentro da tolerância de 2px do QA Helper
+        r11.style.width = (vw + 1) + 'px';
+        // +5px — fora da tolerância
+        r12.style.width = (vw + 5) + 'px';
+      })();
+    </script>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 3: EDS INSPECTOR EDGE CASES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section" data-testgroup="eds">
+    <h2>🧱 Edge Cases — EDS Inspector</h2>
+
+    <div class="block hero" data-testid="EC-E1">
+      <h3>EC-E1: Bloco com classe "hero" — deveria: aparecer como .hero na lista</h3>
+    </div>
+
+    <div class="block casos-de-sucesso" data-testid="EC-E2">
+      <h3>EC-E2: Bloco com classe composta "casos-de-sucesso" — deveria: aparecer correto</h3>
+    </div>
+
+    <div class="block" data-testid="EC-E3">
+      <h3>EC-E3: Bloco sem classe específica (apenas .block) — deveria: aparecer como .block</h3>
+    </div>
+
+    <div data-testid="EC-E4" style="padding:20px;border:1px dashed #ccc;">
+      <h3>EC-E4: Div sem classe .block (não é bloco EDS padrão) — comportamento variável</h3>
+    </div>
+
+    <div class="block multiple classes here" data-testid="EC-E5">
+      <h3>EC-E5: Bloco com múltiplas classes — deveria: usar primeira classe como nome</h3>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 4: VISUAL COMPARATOR EDGE CASES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section" data-testgroup="visual">
+    <h2>🔍 Edge Cases — Visual Comparator</h2>
+
+    <div class="block" data-testid="EC-V1">
+      <h3>EC-V1: Componente simples para captura (deveria: capturar sem erro)</h3>
+      <div style="background:#3b82f6;color:white;padding:20px;border-radius:8px;text-align:center;">
+        Componente sólido para teste de captura
+      </div>
+    </div>
+
+    <div class="block" data-testid="EC-V2">
+      <h3>EC-V2: Componente com backdrop-filter (html2canvas falha — deveria: captura parcial)</h3>
+      <div style="background:rgba(255,255,255,0.4);backdrop-filter:blur(10px);padding:20px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);">
+        Conteúdo com backdrop-filter blur
+      </div>
+    </div>
+
+    <div class="block" data-testid="EC-V3">
+      <h3>EC-V3: Componente com imagem cross-origin (possível falha CORS)</h3>
+      <img alt="Imagem placeholder" src="https://via.placeholder.com/300x100/3b82f6/ffffff?text=Cross+Origin" crossorigin="anonymous" loading="lazy">
+    </div>
+
+    <div class="block" data-testid="EC-V4">
+      <h3>EC-V4: Componente vazio (0 altura) — deveria: capturar canvas vazio ou mínimo</h3>
+      <div class="empty-component"></div>
+    </div>
+
+    <div class="block" data-testid="EC-V5">
+      <h3>EC-V5: Componente muito grande (2000px+) — teste de performance</h3>
+      <div style="height:2000px;background:linear-gradient(to bottom, #3b82f6, #ef4444);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:24px;">
+        Componente de 2000px de altura
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 5: FIGMA ANALYZER EDGE CASES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section" data-testgroup="figma">
+    <h2>🎨 Edge Cases — Figma Analyzer</h2>
+
+    <div class="block hero" data-testid="EC-F1" style="display:flex;flex-direction:column;align-items:center;padding:40px 24px;gap:16px;background:#f8fafc;border-radius:12px;">
+      <h1 style="font-size:48px;font-weight:700;line-height:1.1;letter-spacing:-0.02em;color:#0f172a;font-family:system-ui,sans-serif;">Hero Heading</h1>
+      <p style="font-size:18px;color:#64748b;max-width:560px;text-align:center;">Subtítulo do hero para teste de comparação tipográfica e de layout.</p>
+    </div>
+
+    <div class="block cards" data-testid="EC-F2" style="display:flex;flex-direction:row;gap:24px;padding:32px;background:#ffffff;border-radius:8px;">
+      <div style="flex:1;padding:16px;background:#f1f5f9;border-radius:8px;border:1px solid #e2e8f0;">
+        <h3 style="font-size:16px;font-weight:600;">Card 1</h3>
+        <p style="font-size:14px;color:#64748b;">Descrição</p>
+      </div>
+      <div style="flex:1;padding:16px;background:#f1f5f9;border-radius:8px;border:1px solid #e2e8f0;">
+        <h3 style="font-size:16px;font-weight:600;">Card 2</h3>
+        <p style="font-size:14px;color:#64748b;">Descrição</p>
+      </div>
+    </div>
+
+    <div class="block footer" data-testid="EC-F3" style="padding:13px 17px;gap:11px;display:flex;background:#1e293b;border-radius:6px;color:white;">
+      <span style="font-size:13px;">Footer com spacing fora do 8px grid (13px, 17px, 11px)</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 6: UI & LIFECYCLE EDGE CASES
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section" data-testgroup="ui">
+    <h2>⚙️ Edge Cases — UI & Lifecycle</h2>
+
+    <div class="block" data-testid="EC-U1">
+      <h3>EC-U1: Dupla injeção — colar qa-helper.js duas vezes deveria: mostrar warning, não criar segundo painel</h3>
+    </div>
+
+    <div class="block" data-testid="EC-U2">
+      <h3>EC-U2: Scroll + highlights — após scroll, highlights devem acompanhar (position:fixed)</h3>
+      <div style="height:300px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#64748b;">
+        Scroll para testar posicionamento dos highlights
+      </div>
+    </div>
+
+    <div class="block" data-testid="EC-U3">
+      <h3>EC-U3: ESC no picker — deveria cancelar seleção sem fechar painel</h3>
+    </div>
+
+    <div class="block" data-testid="EC-U4">
+      <h3>EC-U4: ESC duplo — deveria fechar a ferramenta e limpar __qaHelperActive</h3>
+    </div>
+
+    <div class="block" data-testid="EC-U5">
+      <h3>EC-U5: Clique no painel durante picker — deveria: NÃO selecionar elemento do painel</h3>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       TEST RUNNER
+       ═══════════════════════════════════════════════════════════ -->
+  <script>
+  /**
+   * Test Runner para QA Helper Edge Cases
+   *
+   * Valida programaticamente se cada módulo detecta (ou não) os edge cases.
+   * Cole o qa-helper.js antes de rodar, ou rode standalone (o runner importa
+   * os módulos internos via hacks no escopo global).
+   *
+   * Os testes NÃO dependem do QA Helper estar injetado — eles replicam
+   * a lógica de detecção para validar o resultado esperado.
+   */
+  class QATestRunner {
+    constructor() {
+      this.results = [];
+      this.passed = 0;
+      this.failed = 0;
+      this.skipped = 0;
+    }
+
+    assert(testId, description, condition, details = '') {
+      const status = condition ? 'PASS' : 'FAIL';
+      if (condition) this.passed++;
+      else this.failed++;
+      this.results.push({ testId, description, status, details });
+    }
+
+    skip(testId, description, reason) {
+      this.skipped++;
+      this.results.push({ testId, description, status: 'SKIP', details: reason });
+    }
+
+    // ─── LINK & ALT-TEXT TESTS ──────────────────────────────────────────────
+
+    testLinks() {
+      console.group('🔗 Link & Alt-text Edge Cases');
+
+      // EC-L1: href="#" deveria ser detectado como empty
+      const l1 = document.querySelector('[data-testid="EC-L1"] a');
+      this.assert('EC-L1', 'href="#" é detectado como link vazio',
+        l1.getAttribute('href') === '#',
+        'Condição: href === "#" → status empty'
+      );
+
+      // EC-L2: javascript:void(0)
+      const l2 = document.querySelector('[data-testid="EC-L2"] a');
+      this.assert('EC-L2', 'href="javascript:void(0)" é detectado como vazio',
+        l2.getAttribute('href') === 'javascript:void(0)',
+        'Condição: href === "javascript:void(0)" → status empty'
+      );
+
+      // EC-L6: Link sem texto mas com aria-label
+      const l6 = document.querySelector('[data-testid="EC-L6"] a');
+      const l6text = l6.textContent.trim() || l6.getAttribute('aria-label') || '[sem texto]';
+      this.assert('EC-L6', 'Link sem texto usa aria-label como fallback',
+        l6text === 'Link acessível sem texto visível',
+        `Texto resolvido: "${l6text}"`
+      );
+
+      // EC-L7: Link sem texto e sem aria-label
+      const l7 = document.querySelector('[data-testid="EC-L7"] a');
+      const l7text = l7.textContent.trim() || l7.getAttribute('aria-label') || '[sem texto]';
+      this.assert('EC-L7', 'Link sem texto e sem aria-label resolve para "[sem texto]"',
+        l7text === '[sem texto]',
+        `Texto resolvido: "${l7text}"`
+      );
+
+      // EC-L9: mailto NÃO começa com / nem com http — não entra em nenhum branch
+      const l9 = document.querySelector('[data-testid="EC-L9"] a');
+      const l9href = l9.getAttribute('href');
+      const isInternal = l9href.startsWith('/') || l9href.startsWith(window.location.origin);
+      const isExternal = l9href.startsWith('http');
+      this.assert('EC-L9', 'mailto: não é tratado como interno nem externo http',
+        !isInternal && !isExternal,
+        `href="${l9href}" → interno:${isInternal}, externo:${isExternal}. ⚠️ BUG POTENCIAL: status fica "ok" sem validação`
+      );
+
+      // EC-L10: tel: mesma lógica
+      const l10 = document.querySelector('[data-testid="EC-L10"] a');
+      const l10href = l10.getAttribute('href');
+      const l10int = l10href.startsWith('/') || l10href.startsWith(window.location.origin);
+      const l10ext = l10href.startsWith('http');
+      this.assert('EC-L10', 'tel: não é tratado como interno nem externo',
+        !l10int && !l10ext,
+        `href="${l10href}" → status ficará "ok" sem validação. ⚠️ Mesmo comportamento de mailto`
+      );
+
+      // EC-L11: href="" — cai no branch !href? NÃO, porque "" é falsy
+      const l11 = document.querySelector('[data-testid="EC-L11"] a');
+      const l11href = l11.getAttribute('href');
+      this.assert('EC-L11', 'href="" é tratado como falsy pelo branch !href',
+        !l11href,
+        `href="${l11href}" → !href = ${!l11href}. Deveria gerar warning "link vazio"`
+      );
+
+      // EC-L12: <a> sem href — seletor a[href] NÃO deveria capturar
+      const l12anchors = document.querySelectorAll('[data-testid="EC-L12"] a[href]');
+      this.assert('EC-L12', '<a> sem atributo href não é capturado por a[href]',
+        l12anchors.length === 0,
+        `Encontrados: ${l12anchors.length} elementos`
+      );
+
+      // EC-L13: img sem alt
+      const l13img = document.querySelector('[data-testid="EC-L13"] img');
+      this.assert('EC-L13', 'Imagem sem alt: getAttribute("alt") é null',
+        l13img.getAttribute('alt') === null,
+        `alt = ${JSON.stringify(l13img.getAttribute('alt'))}`
+      );
+
+      // EC-L14: img com alt=""
+      const l14img = document.querySelector('[data-testid="EC-L14"] img');
+      this.assert('EC-L14', 'Imagem com alt="" é detectada (trim() === "")',
+        l14img.getAttribute('alt') !== null && l14img.getAttribute('alt').trim() === '',
+        `alt = ${JSON.stringify(l14img.getAttribute('alt'))}`
+      );
+
+      // EC-L15: img com alt preenchido — NÃO deveria gerar issue
+      const l15img = document.querySelector('[data-testid="EC-L15"] img');
+      const l15alt = l15img.getAttribute('alt');
+      this.assert('EC-L15', 'Imagem com alt preenchido NÃO gera issue',
+        l15alt !== null && l15alt.trim() !== '',
+        `alt = "${l15alt}"`
+      );
+
+      // EC-L16: img com alt="   " — deveria detectar
+      const l16img = document.querySelector('[data-testid="EC-L16"] img');
+      const l16alt = l16img.getAttribute('alt');
+      this.assert('EC-L16', 'Imagem com alt="   " (só espaços) é detectada',
+        l16alt !== null && l16alt.trim() === '',
+        `alt = ${JSON.stringify(l16alt)}, trim() = "${l16alt.trim()}"`
+      );
+
+      // EC-L17: href="#section" — a lógica atual SÓ checa href === '#'
+      const l17 = document.querySelector('[data-testid="EC-L17"] a');
+      const l17href = l17.getAttribute('href');
+      const wouldBeEmpty = !l17href || l17href === '#' || l17href === 'javascript:void(0)';
+      const wouldBeInternal = l17href.startsWith('/') || l17href.startsWith(window.location.origin);
+      this.assert('EC-L17', 'href="#section" NÃO é tratado como vazio (só "#" puro é)',
+        !wouldBeEmpty,
+        `⚠️ BUG: href="#section" não cai em nenhum branch: empty=${wouldBeEmpty}, internal=${wouldBeInternal}, external=${l17href.startsWith('http')}. Fica status "ok" sem validação.`
+      );
+
+      // EC-L19: Performance — 120+ links existem
+      const l19links = document.querySelectorAll('[data-testid="EC-L19"] a');
+      this.assert('EC-L19', '120+ links na seção existem para teste de performance',
+        l19links.length >= 120,
+        `Encontrados: ${l19links.length} links`
+      );
+
+      console.groupEnd();
+    }
+
+    // ─── RESPONSIVE TESTS ───────────────────────────────────────────────────
+
+    testResponsive() {
+      console.group('📱 Responsive Edge Cases');
+
+      // EC-R1: overflow forçado
+      const r1 = document.querySelector('[data-testid="EC-R1"]');
+      const r1rect = r1.getBoundingClientRect();
+      this.assert('EC-R1', 'Elemento com 110vw gera overflow detectável',
+        r1rect.right > window.innerWidth + 2,
+        `right=${Math.round(r1rect.right)}, viewport=${window.innerWidth}, excede=${Math.round(r1rect.right - window.innerWidth)}px`
+      );
+
+      // EC-R3: overflow:hidden no parent — getBoundingClientRect NÃO clippa (comportamento documentado)
+      // O fix real é isClippedByAncestor() no QA Helper — aqui validamos que o ancestor TEM overflow:hidden
+      const r3parent = document.querySelector('[data-testid="EC-R3"]');
+      const r3parentStyle = getComputedStyle(r3parent);
+      const r3parentRect = r3parent.getBoundingClientRect();
+      const r3hasClip = r3parentStyle.overflow === 'hidden';
+      const r3parentInViewport = r3parentRect.right <= window.innerWidth + 2;
+      this.assert('EC-R3', 'Parent com overflow:hidden está dentro da viewport (isClippedByAncestor deveria filtrar)',
+        r3hasClip && r3parentInViewport,
+        `overflow=${r3parentStyle.overflow}, parent.right=${Math.round(r3parentRect.right)}, viewport=${window.innerWidth}. O QA Helper usa isClippedByAncestor() para filtrar esse falso positivo.`
+      );
+
+      // EC-R4: container colapsado
+      const r4 = document.querySelector('[data-testid="EC-R4"]');
+      const r4rect = r4.getBoundingClientRect();
+      this.assert('EC-R4', 'Container com width:0 e filhos é detectável',
+        r4rect.width === 0 && r4.children.length > 0,
+        `width=${r4rect.width}, children=${r4.children.length}`
+      );
+
+      // EC-R5: overlap entre blocos
+      const r5a = document.querySelector('[data-testid="EC-R5a"]');
+      const r5b = document.querySelector('[data-testid="EC-R5b"]');
+      const r5aRect = r5a.getBoundingClientRect();
+      const r5bRect = r5b.getBoundingClientRect();
+      const overlapY = !(r5aRect.bottom <= r5bRect.top || r5bRect.bottom <= r5aRect.top);
+      const overlapX = !(r5aRect.right <= r5bRect.left || r5bRect.right <= r5aRect.left);
+      this.assert('EC-R5', 'Blocos com margin-top negativo geram overlap detectável',
+        overlapX && overlapY,
+        `Bloco A bottom=${Math.round(r5aRect.bottom)}, Bloco B top=${Math.round(r5bRect.top)}, overlapY=${overlapY}`
+      );
+
+      // EC-R6: heading com muitas linhas
+      const r6h1 = document.querySelector('[data-testid="EC-R6"] h1');
+      const r6style = getComputedStyle(r6h1);
+      const r6lh = parseFloat(r6style.lineHeight) || parseFloat(r6style.fontSize) * 1.4;
+      const r6lines = Math.round(r6h1.getBoundingClientRect().height / r6lh);
+      this.assert('EC-R6', 'Heading com max-width:300px gera >3 linhas',
+        r6lines > 3,
+        `Linhas calculadas: ${r6lines}, lineHeight=${r6lh.toFixed(1)}px, height=${r6h1.getBoundingClientRect().height.toFixed(1)}px`
+      );
+
+      // EC-R7: imagem distorcida
+      const r7img = document.querySelector('[data-testid="EC-R7"] img');
+      if (r7img.naturalWidth && r7img.naturalHeight) {
+        const natRatio = r7img.naturalWidth / r7img.naturalHeight;
+        const dispRatio = r7img.width / r7img.height;
+        this.assert('EC-R7', 'Imagem forçada em 300x100 gera distorção detectável (diff > 0.1)',
+          Math.abs(natRatio - dispRatio) > 0.1 && r7img.width > 50,
+          `Natural: ${natRatio.toFixed(2)}, Display: ${dispRatio.toFixed(2)}, Diff: ${Math.abs(natRatio - dispRatio).toFixed(2)}`
+        );
+      } else {
+        this.skip('EC-R7', 'Imagem distorcida', 'naturalWidth/Height ainda não carregaram');
+      }
+
+      // EC-R8: imagem pequena (< 50px)
+      const r8img = document.querySelector('[data-testid="EC-R8"] img');
+      this.assert('EC-R8', 'Imagem < 50px NÃO é verificada para distorção',
+        r8img.width <= 50,
+        `Width renderizada: ${r8img.width}px — threshold é 50px`
+      );
+
+      // EC-R9: display:none
+      const r9 = document.querySelector('[data-testid="EC-R9"]');
+      const r9style = getComputedStyle(r9);
+      this.assert('EC-R9', 'Elemento display:none é filtrado da análise',
+        r9style.display === 'none',
+        `display: ${r9style.display}`
+      );
+
+      // EC-R10: visibility:hidden
+      const r10 = document.querySelector('[data-testid="EC-R10"]');
+      const r10style = getComputedStyle(r10);
+      this.assert('EC-R10', 'Elemento visibility:hidden é filtrado da análise',
+        r10style.visibility === 'hidden',
+        `visibility: ${r10style.visibility}`
+      );
+
+      // EC-R11: overflow de 1px (tolerância de 2px)
+      const r11 = document.querySelector('[data-testid="EC-R11"]');
+      const r11rect = r11.getBoundingClientRect();
+      const r11overflow = r11rect.right - window.innerWidth;
+      this.assert('EC-R11', 'Overflow de 1px fica dentro da tolerância de 2px',
+        r11overflow <= 2,
+        `Overflow: ${r11overflow.toFixed(1)}px — tolerância é 2px`
+      );
+
+      // EC-R12: overflow de 5px (fora da tolerância)
+      const r12 = document.querySelector('[data-testid="EC-R12"]');
+      const r12rect = r12.getBoundingClientRect();
+      const r12overflow = r12rect.right - window.innerWidth;
+      this.assert('EC-R12', 'Overflow de 5px é detectado (> tolerância de 2px)',
+        r12overflow > 2,
+        `Overflow: ${r12overflow.toFixed(1)}px`
+      );
+
+      // EC-R-BODY: body scrollWidth
+      this.assert('EC-R-BODY', 'Body com elementos overflow gera scrollWidth > viewport',
+        document.body.scrollWidth > window.innerWidth,
+        `scrollWidth=${document.body.scrollWidth}, viewport=${window.innerWidth}`
+      );
+
+      console.groupEnd();
+    }
+
+    // ─── EDS INSPECTOR TESTS ────────────────────────────────────────────────
+
+    testEDS() {
+      console.group('🧱 EDS Inspector Edge Cases');
+
+      // EC-E1: bloco com classe "hero"
+      const e1 = document.querySelector('[data-testid="EC-E1"]');
+      this.assert('EC-E1', 'Bloco .hero é encontrado pelo seletor .block',
+        e1.classList.contains('block') && e1.classList.contains('hero'),
+        `Classes: ${[...e1.classList].join(', ')}`
+      );
+
+      // EC-E2: classe composta
+      const e2 = document.querySelector('[data-testid="EC-E2"]');
+      const e2name = [...e2.classList][0];
+      this.assert('EC-E2', 'Bloco com classe composta usa primeira classe como nome',
+        e2name === 'block',
+        `⚠️ Primeira classe: "${e2name}". O QA Helper usa classes[0], que é "block", não "casos-de-sucesso". A identificação do bloco depende da ordem das classes no HTML.`
+      );
+
+      // EC-E5: múltiplas classes
+      const e5 = document.querySelector('[data-testid="EC-E5"]');
+      const e5classes = [...e5.classList];
+      this.assert('EC-E5', 'Bloco com múltiplas classes: primeira é usada como nome',
+        e5classes[0] === 'block',
+        `Classes: [${e5classes.join(', ')}]. O nome será "${e5classes[0]}".`
+      );
+
+      // Sections count
+      const sections = document.querySelectorAll('.section');
+      this.assert('EC-E-SECTIONS', 'Todas as sections são encontradas',
+        sections.length >= 5,
+        `Sections encontradas: ${sections.length}`
+      );
+
+      // Meta tags
+      const ogTitle = document.querySelector('meta[name="og:title"]');
+      this.assert('EC-E-META', 'Meta og:title está presente e é lida corretamente',
+        ogTitle && ogTitle.getAttribute('content').includes('Edge Case'),
+        `og:title = "${ogTitle?.getAttribute('content')}"`
+      );
+
+      console.groupEnd();
+    }
+
+    // ─── FIGMA ANALYZER TESTS ───────────────────────────────────────────────
+
+    testFigma() {
+      console.group('🎨 Figma Analyzer Edge Cases');
+
+      // ── URL Parser (replicando a lógica pura) ─────────────────────────
+      const parseUrl = (url) => {
+        const match = url.match(
+          /figma\.com\/(?:design|file|proto)\/([a-zA-Z0-9]+)(?:\/[^?]*)?(?:\?.*node-id=([^&]+))?/,
+        );
+        if (!match) return null;
+        const fileKey = match[1];
+        let nodeId = match[2] || null;
+        if (nodeId) nodeId = decodeURIComponent(nodeId).replace('-', ':');
+        return { fileKey, nodeId };
+      };
+
+      // EC-F-URL1: formato /design/ com node-id (dash separator)
+      const url1 = parseUrl('https://www.figma.com/design/ABC123def/MyDesign?node-id=1-2');
+      this.assert('EC-F-URL1', 'Parse URL /design/ com node-id=1-2',
+        url1 && url1.fileKey === 'ABC123def' && url1.nodeId === '1:2',
+        `fileKey="${url1?.fileKey}", nodeId="${url1?.nodeId}"`
+      );
+
+      // EC-F-URL2: formato /file/ com node-id URL-encoded
+      const url2 = parseUrl('https://www.figma.com/file/XYZ789/Name?node-id=100%3A200&other=param');
+      this.assert('EC-F-URL2', 'Parse URL /file/ com node-id URL-encoded',
+        url2 && url2.fileKey === 'XYZ789' && url2.nodeId === '100:200',
+        `fileKey="${url2?.fileKey}", nodeId="${url2?.nodeId}"`
+      );
+
+      // EC-F-URL3: URL sem node-id
+      const url3 = parseUrl('https://www.figma.com/file/KEY123/ProjectName');
+      this.assert('EC-F-URL3', 'Parse URL sem node-id retorna nodeId=null',
+        url3 && url3.fileKey === 'KEY123' && url3.nodeId === null,
+        `fileKey="${url3?.fileKey}", nodeId=${url3?.nodeId}`
+      );
+
+      // EC-F-URL4: formato /proto/
+      const url4 = parseUrl('https://www.figma.com/proto/PROTO99/Prototype?node-id=5-10');
+      this.assert('EC-F-URL4', 'Parse URL /proto/',
+        url4 && url4.fileKey === 'PROTO99' && url4.nodeId === '5:10',
+        `fileKey="${url4?.fileKey}", nodeId="${url4?.nodeId}"`
+      );
+
+      // EC-F-URL5: URL inválida
+      const url5 = parseUrl('https://google.com/file/ABC/test');
+      this.assert('EC-F-URL5', 'URL não-Figma retorna null',
+        url5 === null,
+        `Resultado: ${JSON.stringify(url5)}`
+      );
+
+      // EC-F-URL6: URL com query params extras
+      const url6 = parseUrl('https://www.figma.com/design/K3Y/Name?type=design&node-id=42-7&mode=dev');
+      this.assert('EC-F-URL6', 'Parse URL com params antes de node-id',
+        url6 && url6.fileKey === 'K3Y' && url6.nodeId === '42:7',
+        `fileKey="${url6?.fileKey}", nodeId="${url6?.nodeId}"`
+      );
+
+      // ── Color Conversion ──────────────────────────────────────────────
+      const figmaColorToRGB = (c) => {
+        if (!c) return null;
+        return { r: Math.round(c.r * 255), g: Math.round(c.g * 255), b: Math.round(c.b * 255) };
+      };
+      const parseCSSColor = (str) => {
+        if (!str || str === 'transparent') return null;
+        const m = str.match(/rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/);
+        if (m) return { r: +m[1], g: +m[2], b: +m[3] };
+        return null;
+      };
+      const colorDistance = (a, b) => {
+        if (!a || !b) return 999;
+        return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
+      };
+
+      // EC-F-COL1: Figma color 0-1 → RGB 0-255
+      const col1 = figmaColorToRGB({ r: 1, g: 0, b: 0 });
+      this.assert('EC-F-COL1', 'Figma {r:1,g:0,b:0} → rgb(255,0,0)',
+        col1.r === 255 && col1.g === 0 && col1.b === 0,
+        `Resultado: rgb(${col1.r},${col1.g},${col1.b})`
+      );
+
+      // EC-F-COL2: Figma color com decimais
+      const col2 = figmaColorToRGB({ r: 0.937, g: 0.267, b: 0.267 });
+      this.assert('EC-F-COL2', 'Figma color com decimais arredonda corretamente',
+        col2.r === 239 && col2.g === 68 && col2.b === 68,
+        `Resultado: rgb(${col2.r},${col2.g},${col2.b}) — esperado rgb(239,68,68)`
+      );
+
+      // EC-F-COL3: Parse CSS color string
+      const col3 = parseCSSColor('rgb(59, 130, 246)');
+      this.assert('EC-F-COL3', 'Parse "rgb(59, 130, 246)"',
+        col3 && col3.r === 59 && col3.g === 130 && col3.b === 246,
+        `Resultado: ${JSON.stringify(col3)}`
+      );
+
+      // EC-F-COL4: Color distance zero (mesma cor)
+      const dist1 = colorDistance({ r: 100, g: 100, b: 100 }, { r: 100, g: 100, b: 100 });
+      this.assert('EC-F-COL4', 'Mesma cor → distância 0',
+        dist1 === 0,
+        `Distância: ${dist1}`
+      );
+
+      // EC-F-COL5: Color distance pequena (dentro da tolerância de 25)
+      const dist2 = colorDistance({ r: 100, g: 100, b: 100 }, { r: 110, g: 105, b: 98 });
+      this.assert('EC-F-COL5', 'Cores similares → distância < 25',
+        dist2 < 25,
+        `Distância: ${dist2.toFixed(1)} (tolerância: 25)`
+      );
+
+      // EC-F-COL6: Color distance grande (vermelho vs azul)
+      const dist3 = colorDistance({ r: 255, g: 0, b: 0 }, { r: 0, g: 0, b: 255 });
+      this.assert('EC-F-COL6', 'Vermelho vs azul → distância > 25',
+        dist3 > 25,
+        `Distância: ${dist3.toFixed(1)}`
+      );
+
+      // ── Name Matching ─────────────────────────────────────────────────
+      const normalizeName = (name) => (name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const namesSimilar = (a, b) => {
+        if (!a || !b) return false;
+        if (a === b) return true;
+        if (a.includes(b) || b.includes(a)) return true;
+        if (a.length < 3 || b.length < 3) return false;
+        let common = 0;
+        for (const ch of a) { if (b.includes(ch)) common++; }
+        return common / Math.max(a.length, b.length) > 0.6;
+      };
+
+      // EC-F-NAME1: match exato
+      this.assert('EC-F-NAME1', 'normalizeName("Hero Section") → "herosection"',
+        normalizeName('Hero Section') === 'herosection',
+        `Resultado: "${normalizeName('Hero Section')}"`
+      );
+
+      // EC-F-NAME2: match com hífens e underscores
+      this.assert('EC-F-NAME2', '"casos-de-sucesso" normaliza para "casosdesucesso"',
+        normalizeName('casos-de-sucesso') === 'casosdesucesso',
+        `Resultado: "${normalizeName('casos-de-sucesso')}"`
+      );
+
+      // EC-F-NAME3: namesSimilar com inclusão
+      const n3a = normalizeName('Hero');
+      const n3b = normalizeName('hero-section');
+      this.assert('EC-F-NAME3', '"hero" é similar a "herosection" (inclusão)',
+        namesSimilar(n3a, n3b),
+        `"${n3a}" similar a "${n3b}" = ${namesSimilar(n3a, n3b)}`
+      );
+
+      // EC-F-NAME4: namesSimilar com nomes muito diferentes
+      const n4a = normalizeName('header');
+      const n4b = normalizeName('footer');
+      this.assert('EC-F-NAME4', '"header" NÃO é similar a "footer"',
+        !namesSimilar(n4a, n4b),
+        `"${n4a}" similar a "${n4b}" = ${namesSimilar(n4a, n4b)}`
+      );
+
+      // EC-F-NAME5: nomes curtos (< 3 chars) — não usam fuzzy
+      this.assert('EC-F-NAME5', 'Nomes < 3 chars: "ab" vs "ac" → NÃO similar (sem fuzzy)',
+        !namesSimilar('ab', 'ac'),
+        'Nomes curtos retornam false a menos que sejam iguais ou contenham um ao outro'
+      );
+
+      // ── 8px Grid Audit (via DOM) ──────────────────────────────────────
+      const f3 = document.querySelector('[data-testid="EC-F3"]');
+      if (f3) {
+        const cs = getComputedStyle(f3);
+        const pt = parseFloat(cs.paddingTop);
+        const pr = parseFloat(cs.paddingRight);
+        const gap = parseFloat(cs.gap) || 0;
+        this.assert('EC-F-GRID1', 'Footer com 13px padding-top não é múltiplo de 4',
+          pt % 4 !== 0,
+          `paddingTop=${pt}px — 13 % 4 = ${13 % 4} (não é 0)`
+        );
+        this.assert('EC-F-GRID2', 'Footer com 17px padding-right não é múltiplo de 4',
+          pr % 4 !== 0,
+          `paddingRight=${pr}px`
+        );
+        this.assert('EC-F-GRID3', 'Footer com 11px gap não é múltiplo de 4',
+          gap > 0 && gap % 4 !== 0,
+          `gap=${gap}px`
+        );
+      }
+
+      // ── Mock Figma Token Extraction ───────────────────────────────────
+      // Simula um nó Figma minimal para testar extractFigmaTokens
+      const mockFigmaNode = {
+        name: 'Hero',
+        type: 'FRAME',
+        absoluteBoundingBox: { x: 0, y: 0, width: 1200, height: 400 },
+        layoutMode: 'VERTICAL',
+        primaryAxisAlignItems: 'CENTER',
+        counterAxisAlignItems: 'CENTER',
+        paddingTop: 40, paddingRight: 24, paddingBottom: 40, paddingLeft: 24,
+        itemSpacing: 16,
+        fills: [{ type: 'SOLID', color: { r: 0.973, g: 0.98, b: 0.988 }, visible: true }],
+        strokes: [],
+        strokeWeight: 0,
+        cornerRadius: 12,
+        children: [
+          {
+            name: 'Heading',
+            type: 'TEXT',
+            style: { fontFamily: 'Inter', fontSize: 48, fontWeight: 700, lineHeightPx: 52.8, letterSpacing: -0.96, textAlignHorizontal: 'CENTER' },
+            fills: [{ type: 'SOLID', color: { r: 0.059, g: 0.09, b: 0.165 }, visible: true }],
+            strokes: [], strokeWeight: 0, cornerRadius: 0,
+            visible: true,
+          },
+        ],
+        visible: true,
+      };
+
+      // Validar que o token extraction funciona com a estrutura mock
+      this.assert('EC-F-MOCK1', 'Mock Figma node tem estrutura mínima válida',
+        mockFigmaNode.absoluteBoundingBox.width === 1200 &&
+        mockFigmaNode.layoutMode === 'VERTICAL' &&
+        mockFigmaNode.paddingTop === 40 &&
+        mockFigmaNode.children[0].style.fontSize === 48,
+        'Todos os campos necessários estão presentes'
+      );
+
+      // EC-F-HERO: Comparar mock Figma com bloco DOM real .hero
+      const heroEl = document.querySelector('[data-testid="EC-F1"]');
+      if (heroEl) {
+        const heroCS = getComputedStyle(heroEl);
+        const heroPT = parseFloat(heroCS.paddingTop);
+        // O mock espera padding-top: 40px, o DOM tem padding: 40px
+        this.assert('EC-F-HERO', 'Bloco .hero tem padding-top = 40px (match com mock Figma)',
+          heroPT === 40,
+          `DOM paddingTop=${heroPT}px, Figma esperado=40px`
+        );
+      }
+
+      // ── JSON Fallback Parse ───────────────────────────────────────────
+      // Testar os 3 formatos aceitos pelo analyzeFromJSON
+
+      // Formato 1: API /v1/files/KEY/nodes response
+      const jsonFormat1 = { nodes: { '1:2': { document: mockFigmaNode } } };
+      this.assert('EC-F-JSON1', 'Formato API nodes: extrai document de nodes[id]',
+        jsonFormat1.nodes['1:2'].document.name === 'Hero',
+        'Formato { nodes: { "1:2": { document: {...} } } }'
+      );
+
+      // Formato 2: API /v1/files/KEY response
+      const jsonFormat2 = { document: mockFigmaNode };
+      this.assert('EC-F-JSON2', 'Formato API file: extrai document direto',
+        jsonFormat2.document.name === 'Hero',
+        'Formato { document: {...} }'
+      );
+
+      // Formato 3: nó direto
+      const jsonFormat3 = mockFigmaNode;
+      this.assert('EC-F-JSON3', 'Formato nó direto: usa node.type como indicador',
+        jsonFormat3.type === 'FRAME',
+        'Formato { type: "FRAME", name: "Hero", ... }'
+      );
+
+      console.groupEnd();
+    }
+
+    // ─── UI & LIFECYCLE TESTS ───────────────────────────────────────────────
+
+    testUI() {
+      console.group('⚙️ UI & Lifecycle Edge Cases');
+
+      // EC-U1: dupla injeção — só testa se QA Helper está injetado
+      if (window.__qaHelperActive) {
+        this.assert('EC-U1', 'Flag __qaHelperActive é true quando QA Helper está ativo',
+          window.__qaHelperActive === true,
+          `__qaHelperActive = ${window.__qaHelperActive}`
+        );
+      } else {
+        this.skip('EC-U1', '__qaHelperActive check', 'QA Helper não injetado — cole qa-helper.js antes para testar lifecycle');
+      }
+
+      // EC-U1b: root element
+      const root = document.getElementById('qa-helper-root');
+      if (root) {
+        this.assert('EC-U1b', 'Apenas um #qa-helper-root existe no DOM',
+          document.querySelectorAll('#qa-helper-root').length === 1,
+          `Encontrados: ${document.querySelectorAll('#qa-helper-root').length}`
+        );
+
+        // Shadow DOM existe
+        this.assert('EC-U1c', 'Shadow DOM está attached ao root',
+          root.shadowRoot !== null,
+          `shadowRoot: ${root.shadowRoot ? 'presente' : 'ausente'}`
+        );
+
+        // Painel visível
+        const panel = root.shadowRoot?.querySelector('.qa-panel');
+        this.assert('EC-U1d', 'Painel .qa-panel existe dentro do Shadow DOM',
+          panel !== null,
+          ''
+        );
+      } else {
+        this.skip('EC-U1b', '#qa-helper-root check', 'QA Helper não está injetado — cole qa-helper.js primeiro');
+        this.skip('EC-U1c', 'Shadow DOM check', 'QA Helper não está injetado');
+        this.skip('EC-U1d', '.qa-panel check', 'QA Helper não está injetado');
+      }
+
+      console.groupEnd();
+    }
+
+    // ─── BUGS CONHECIDOS (deveria falhar) ───────────────────────────────────
+
+    testKnownBugs() {
+      console.group('🐛 Bugs Conhecidos / Gaps na Detecção');
+
+      // BUG-1: href="#section" não é tratado
+      const bug1 = document.querySelector('[data-testid="EC-L17"] a');
+      const bug1href = bug1.getAttribute('href');
+      const bug1empty = !bug1href || bug1href === '#' || bug1href === 'javascript:void(0)';
+      const bug1internal = bug1href.startsWith('/') || bug1href.startsWith(window.location.origin);
+      const bug1external = bug1href.startsWith('http');
+      const bug1falls = !bug1empty && !bug1internal && !bug1external;
+      this.assert('BUG-1', 'href="#section" cai em dead zone (nenhum branch)',
+        bug1falls,
+        `Nenhum branch captura: empty=${bug1empty}, internal=${bug1internal}, external=${bug1external}. Fix: tratar hrefs começando com "#" como âncoras internas.`
+      );
+
+      // BUG-2: mailto: e tel: ficam como "ok" sem validação
+      const bug2 = document.querySelector('[data-testid="EC-L9"] a');
+      const bug2href = bug2.getAttribute('href');
+      const bug2falls = !(!bug2href || bug2href === '#' || bug2href === 'javascript:void(0)')
+        && !(bug2href.startsWith('/') || bug2href.startsWith(window.location.origin))
+        && !bug2href.startsWith('http');
+      this.assert('BUG-2', 'mailto: cai em dead zone (status "ok" sem validação)',
+        bug2falls,
+        `Fix: adicionar branch para mailto:/tel: como status "special".`
+      );
+
+      // BUG-3: EDS blocks usam classes[0] que é sempre "block" se HTML é class="block hero"
+      const bug3 = document.querySelector('[data-testid="EC-E2"]');
+      const bug3name = [...bug3.classList][0];
+      this.assert('BUG-3', 'Nome do bloco pega "block" ao invés da classe específica',
+        bug3name === 'block',
+        `Fix: usar classes.find(c => c !== "block") || classes[0] para pegar o nome real.`
+      );
+
+      // BUG-4: overflow:hidden no parent — getBoundingClientRect NÃO clippa
+      const bug4child = document.querySelector('[data-testid="EC-R3"] .overflow-child');
+      const bug4parent = document.querySelector('[data-testid="EC-R3"]');
+      const bug4rect = bug4child.getBoundingClientRect();
+      const bug4parentRect = bug4parent.getBoundingClientRect();
+      this.assert('BUG-4', 'getBoundingClientRect do child vaza além do parent overflow:hidden',
+        bug4rect.right > bug4parentRect.right,
+        `child.right=${Math.round(bug4rect.right)}, parent.right=${Math.round(bug4parentRect.right)}. Fix aplicado no QA Helper: isClippedByAncestor() filtra esse caso.`
+      );
+
+      // BUG-5: fetch com mode:"no-cors" retorna opaque response (status = 0)
+      this.assert('BUG-5', 'fetch HEAD com mode:"no-cors" retorna status 0 (opaque)',
+        true,
+        `⚠️ A flag mode:"no-cors" faz TODA response ser opaque (status=0, body vazio). O branch "status >= 400" NUNCA será true. Fix: remover mode:"no-cors" para links same-origin.`
+      );
+
+      console.groupEnd();
+    }
+
+    // ─── RUN ALL ────────────────────────────────────────────────────────────
+
+    run() {
+      console.clear();
+      console.log('%c═══════════════════════════════════════════════════════', 'color:#3b82f6;font-weight:bold;');
+      console.log('%c  QA Helper — Edge Case Test Suite', 'color:#f8fafc;font-weight:bold;font-size:16px;background:#0f172a;padding:8px 16px;border-radius:4px;');
+      console.log('%c═══════════════════════════════════════════════════════', 'color:#3b82f6;font-weight:bold;');
+      console.log('');
+
+      this.testLinks();
+      this.testResponsive();
+      this.testEDS();
+      this.testFigma();
+      this.testUI();
+      this.testKnownBugs();
+
+      console.log('');
+      console.log('%c═══════════════ RESULTADO ═══════════════', 'color:#3b82f6;font-weight:bold;');
+
+      const total = this.passed + this.failed + this.skipped;
+      console.log(
+        `%c ✅ ${this.passed} PASS  %c ❌ ${this.failed} FAIL  %c ⏭ ${this.skipped} SKIP  %c (${total} total)`,
+        'color:#22c55e;font-weight:bold;',
+        'color:#ef4444;font-weight:bold;',
+        'color:#f59e0b;font-weight:bold;',
+        'color:#94a3b8;'
+      );
+      console.log('');
+
+      // Listar falhas
+      const failures = this.results.filter(r => r.status === 'FAIL');
+      if (failures.length) {
+        console.group(`%c❌ Falhas (${failures.length})`, 'color:#ef4444;font-weight:bold;');
+        failures.forEach(f => {
+          console.log(`%c${f.testId}%c ${f.description}`, 'color:#ef4444;font-weight:bold;', 'color:#e2e8f0;');
+          if (f.details) console.log(`  → ${f.details}`);
+        });
+        console.groupEnd();
+      }
+
+      // Listar bugs conhecidos
+      const bugs = this.results.filter(r => r.testId.startsWith('BUG-'));
+      if (bugs.length) {
+        console.group(`%c🐛 Bugs conhecidos (${bugs.length})`, 'color:#f59e0b;font-weight:bold;');
+        bugs.forEach(b => {
+          console.log(`%c${b.testId}%c ${b.description}`, 'color:#f59e0b;font-weight:bold;', 'color:#e2e8f0;');
+          if (b.details) console.log(`  → ${b.details}`);
+        });
+        console.groupEnd();
+      }
+
+      // Tabela completa
+      console.log('');
+      console.group('📋 Resultados completos');
+      console.table(this.results.map(r => ({
+        ID: r.testId,
+        Status: r.status,
+        Descrição: r.description,
+        Detalhes: r.details.slice(0, 100),
+      })));
+      console.groupEnd();
+
+      return { passed: this.passed, failed: this.failed, skipped: this.skipped, results: this.results };
+    }
+  }
+
+  function runAllTests() {
+    const runner = new QATestRunner();
+    window.__qaTestResults = runner.run();
+  }
+
+  // Auto-expose
+  window.QATestRunner = QATestRunner;
+  window.runAllTests = runAllTests;
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "name": "eds-qa-helper",
+  "version": "1.0.0",
+  "description": "Visual audit & responsive QA tool for Adobe Experience Manager Edge Delivery Services — Chrome Extension + standalone script",
+  "main": "src/qa-helper.js",
+  "scripts": {
+    "test": "echo \"Open tests/edge-cases.html in a browser and click Run Tests\"",
+    "build:bookmarklet": "node scripts/build-bookmarklet.js",
+    "serve": "npx serve . -p 8080"
+  },
+  "keywords": [
+    "aem",
+    "adobe-experience-manager",
+    "edge-delivery-services",
+    "franklin",
+    "chrome-extension",
+    "qa",
+    "visual-regression",
+    "accessibility",
+    "responsive",
+    "figma",
+    "design-tokens",
+    "frontend-tools"
+  ],
+  "author": "Gabriel",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/eds-qa-helper"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/eds-qa-helper#readme",
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/eds-qa-helper/issues"
+  }
+}

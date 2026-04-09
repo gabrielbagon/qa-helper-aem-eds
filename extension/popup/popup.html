@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <div class="logo">
+        <span class="dot"></span>
+        <span class="title">EDS QA Helper</span>
+      </div>
+      <span class="version">v1.0.0</span>
+    </div>
+
+    <div id="status" class="status">
+      <span class="status-dot inactive"></span>
+      <span class="status-text">Checking...</span>
+    </div>
+
+    <button id="toggle-btn" class="btn primary" disabled>
+      <span id="toggle-icon">▶</span>
+      <span id="toggle-label">Activate</span>
+    </button>
+
+    <div class="info" id="page-info"></div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Figma Token</div>
+    <div class="token-row">
+      <input type="password" id="token-input" placeholder="Personal Access Token" spellcheck="false">
+      <button id="token-save" class="btn small" title="Save">💾</button>
+    </div>
+    <div class="token-hint">Saved locally. Used for Figma design comparison.</div>
+
+    <div class="divider"></div>
+
+    <div class="footer">
+      <a href="https://github.com/YOUR_USERNAME/eds-qa-helper" target="_blank">GitHub</a>
+      <span class="sep">·</span>
+      <a href="https://github.com/YOUR_USERNAME/eds-qa-helper/issues" target="_blank">Report Bug</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
